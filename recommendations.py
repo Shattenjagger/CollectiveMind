@@ -129,3 +129,55 @@ def get_recommendations(prefs, person, similarity=sim_pearson):
     rankings.sort()
     rankings.reverse()
     return rankings
+
+def load_movie_lens(path='ml-100k/'):
+    movies = {}
+    for line in open(path + '/u.item'):
+        (movie_id, title) = line.split('|')[0:2]
+        movies[movie_id] = title
+    prefs = {}
+    for line in open(path + '/u.data'):
+        (user, movie_id, rating, ts) = line.split('\t')
+        prefs.setdefault(user, {})
+        prefs[user][movies[movie_id]] = float(rating)
+    return prefs
+
+def transform_prefs(prefs):
+    result = {}
+    for person in prefs:
+        for item in prefs[person]:
+            result.setdefault(item, {})
+            result[item][person] = prefs[person][item]
+    return result
+
+def calculate_similar_items(prefs, n=10):
+    result = {}
+    item_prefs = transform_prefs(prefs)
+    for item in item_prefs:
+        scores = top_matches(item_prefs, item, n=n, similarity=sim_distance)
+        result[item] = scores
+    return result
+
+def get_recommended_items(prefs, item_match, user):
+    user_ratings = prefs[user]
+    scores = {}
+    total_sim = {}
+    for (item, rating) in user_ratings.items():
+        for (similarity, item2) in item_match[item]:
+            if item2 in user_ratings:
+                continue
+            scores.setdefault(item2, 0)
+            scores[item2] += similarity * rating
+            total_sim.setdefault(item2, 0)
+            total_sim[item2] += similarity
+    rankings = [(score / total_sim[item], item) for item, score in scores.items()]
+    rankings.sort()
+    rankings.reverse()
+    return rankings
+
+
+prefs = load_movie_lens()
+print get_recommendations(prefs, '87')[0:30]
+item_sim = calculate_similar_items(prefs, n=50)
+print get_recommended_items(prefs, item_sim, '87')[0:30]
+
